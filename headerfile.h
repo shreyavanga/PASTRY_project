@@ -22,4 +22,5 @@
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <openssl/sha.h> 
+#include<signal.h>
 using namespace std;
