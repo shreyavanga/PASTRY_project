@@ -17,6 +17,8 @@ struct table
 }node;
 map<char,int> h;
 map<string,string> mytable;
+map<string,addr>mytable2;
+map<string,string>keyhashtable;
 char buffer[MAX_SIZE];
 pthread_t thread1[100];
 int lo;
@@ -509,7 +511,7 @@ void setLeaf(table temp)
 	for(it=h.begin();it!=h.end()&&c<4;it++,c++)
 	node.lSet[c]=(*it);
 }
-void putKey(string key,string val)
+void putKey(string key,string val, addr t)
 {
 	string kk=hashC(key);
 	cout<<"\n\nKey(hash) : "<<kk<<" Value : "<<val<<endl;
@@ -518,11 +520,14 @@ void putKey(string key,string val)
 	{
 		cout<<"\nKey store on my Node.\n";
 		mytable.insert(make_pair(kk,val));
+		mytable2.insert(make_pair(kk,t));
+		keyhashtable.insert(make_pair(kk,key));
+		cout<<t.nodeId<<endl;
 	
 	}
 	else
 	{
-		string msg="setkey+"+key+"+"+val;
+		string msg="setkey+"+key+"+"+val+"+" +node.nodeId + "+" + node.ip + "+" + node.port ;
 		cout<<"Key send to "<<temp.nodeId<<endl;
 		sendTo(msg,temp.ip,temp.port);
 	}
@@ -552,6 +557,87 @@ void getKey(string key,string ip,string port)
 		sendTo(msg,temp.ip,temp.port);
 	}
 }
+
+void checklr(string id)
+{
+	int pos=-1;
+	addr temp;
+	for(int i=0;i<4;i++)
+	{
+		if(node.lSet[i].nodeId == id)
+		{
+			node.lSet[i].ip = "_";
+			node.lSet[i].port = "_";
+			node.lSet[i].nodeId = "_";
+			pos = i;
+		}
+	}
+	for(int i=0;i<4;i++)
+	{
+		if(node.nSet[i].nodeId == id)
+		{
+			node.nSet[i].ip = "_";
+			node.nSet[i].port = "_";
+			node.nSet[i].nodeId = "_";
+		}
+	}
+
+	for(int i=0;i<8;i++)
+	{
+		for(int j=0;j<16 ; j++)
+		{
+			if(node.rTable[i][j].nodeId == id)
+			{
+				node.rTable[i][j].ip = "_";
+				node.rTable[i][j].port = "_";
+				node.rTable[i][j].nodeId = "_";
+			}
+
+		}
+	}
+	bool flag = false;
+	int i;
+	if(pos != -1 && pos != 3)
+	{
+		if(node.lSet[pos+1].nodeId != "_")
+		{
+			for( i=pos+1;i<3;i++)
+			{
+				if(node.lSet[i].nodeId == "_")
+				{
+					flag = true;
+					break;
+				}
+				else
+				{
+					temp = node.lSet[i];
+					node.lSet[i] = node.lSet[i-1];
+					node.lSet[i-1]=temp;
+				}
+			}
+			if(flag == true)
+			{
+				node.lSet[i-1].ip = "_";
+				node.lSet[i-1].port = "_";
+				node.lSet[i-1].nodeId = "_";
+			}
+		}
+	}
+
+	addr tem;
+	tem.ip=node.ip;
+	tem.nodeId=node.nodeId;
+	tem.port=node.port;
+	for(int i=0;i<8;i++)
+	{
+		if(node.rTable[i][h[node.nodeId[i]]].nodeId == "_")
+			node.rTable[i][h[node.nodeId[i]]]=tem;
+	}
+
+
+}
+
+
 void *connect1(void *arg)
 {
 	int connfd =*((int*)(&arg));
@@ -629,7 +715,14 @@ void *connect1(void *arg)
 	{
 		string key=rev[1];
 		string val=rev[2];
-		putKey(key,val);
+		string id = rev[3];
+		string ip  = rev[4];
+		string port = rev[5];
+		addr temp;
+		temp.nodeId= id;
+		temp.ip  = ip;
+		temp.port = port;
+		putKey(key,val,temp);
 	}
 	else if(rev[0]=="found")
 	{
@@ -638,6 +731,30 @@ void *connect1(void *arg)
 	else if(rev[0]=="getkey")
 	{
 		getKey(rev[1],rev[2],rev[3]);
+	}
+	else if(rev[0]=="shutdown")
+	{
+		close(connfd);
+		exit(0);
+	}
+	else if(rev[0] == "quit")
+	{
+		string id = rev[1];
+		checklr(id);
+
+	}
+	else if(rev[0] == "putkeywhenquit")
+	{
+		string key=rev[1];
+		string val=rev[2];
+		string id = rev[3];
+		string ip  = rev[4];
+		string port = rev[5];
+		addr temp;
+		temp.nodeId= id;
+		temp.ip  = ip;
+		temp.port = port;
+		putKey(key,val,temp);
 	}
 	close(connfd);	
 }
@@ -694,6 +811,134 @@ void *create_server(void *arg)
 		lo++;
 	}
 }
+
+void shutdown_fn()
+{
+	vector<addr> v;
+		set<string> s;
+		string msg="shutdown+";
+		for(int i=0;i<4;i++)
+		{
+			if(node.lSet[i].nodeId != "_"&&node.lSet[i].nodeId != node.nodeId)
+			{
+				set<string>::iterator it=s.find(node.lSet[i].nodeId);
+				if(it==s.end())
+				{
+					v.push_back(node.lSet[i]);
+					s.insert(node.lSet[i].nodeId);
+				}
+			}
+		}
+		for(int i=0;i<4;i++)
+		{
+			if(node.nSet[i].nodeId != "_"&&node.nSet[i].nodeId != node.nodeId)
+			{
+				set<string>::iterator it=s.find(node.nSet[i].nodeId);
+				if(it==s.end())
+				{
+					v.push_back(node.nSet[i]);
+					s.insert(node.nSet[i].nodeId);
+				}
+			}
+		}
+		for(int i=0;i<8;i++)
+		{
+			for(int j=0;j<16;j++)
+			{
+				if(node.rTable[i][j].nodeId != "_"&&node.rTable[i][j].nodeId != node.nodeId)
+				{
+					set<string>::iterator it=s.find(node.rTable[i][j].nodeId);
+					if(it==s.end())
+					{
+						v.push_back(node.rTable[i][j]);
+						s.insert(node.rTable[i][j].nodeId);
+					}
+				}
+			}	
+		}
+
+		for(int i=0;i<v.size();i++)
+		{
+			sendTo(msg,v[i].ip,v[i].port);
+			// cout<<"\nRTable share to :"<<node.nodeId<<" -> "<<v[i].nodeId<<endl;
+		}
+
+}
+
+void quit_fn(){
+
+vector<addr> v;
+		set<string> s;
+		string msg="quit+"+node.nodeId +"+";
+		for(int i=0;i<4;i++)
+		{
+			if(node.lSet[i].nodeId != "_"&&node.lSet[i].nodeId != node.nodeId)
+			{
+				set<string>::iterator it=s.find(node.lSet[i].nodeId);
+				if(it==s.end())
+				{
+					v.push_back(node.lSet[i]);
+					s.insert(node.lSet[i].nodeId);
+				}
+			}
+		}
+		for(int i=0;i<4;i++)
+		{
+			if(node.nSet[i].nodeId != "_"&&node.nSet[i].nodeId != node.nodeId)
+			{
+				set<string>::iterator it=s.find(node.nSet[i].nodeId);
+				if(it==s.end())
+				{
+					v.push_back(node.nSet[i]);
+					s.insert(node.nSet[i].nodeId);
+				}
+			}
+		}
+		for(int i=0;i<8;i++)
+		{
+			for(int j=0;j<16;j++)
+			{
+				if(node.rTable[i][j].nodeId != "_"&&node.rTable[i][j].nodeId != node.nodeId)
+				{
+					set<string>::iterator it=s.find(node.rTable[i][j].nodeId);
+					if(it==s.end())
+					{
+						v.push_back(node.rTable[i][j]);
+						s.insert(node.rTable[i][j].nodeId);
+					}
+				}
+			}	
+		}
+
+		for(int i=0;i<v.size();i++)
+		{
+			sendTo(msg,v[i].ip,v[i].port);
+			// cout<<"\nRTable share to :"<<node.nodeId<<" -> "<<v[i].nodeId<<endl;
+		}
+
+
+
+}
+
+void remtable()//---------------removing all 
+{
+	string msg = "putkeywhenquit+";
+	for(auto it = mytable.begin(); it != mytable.end() ;it++)
+	{
+		string k = it->first;
+		cout<<"string k = "<<k<<endl;
+		string val  = it->second;
+		cout<<"value = "<<val<<endl;
+		addr temp = mytable2[k];
+		string key = keyhashtable[k];
+		cout<<"string key = "<<key<<endl;
+		msg = msg+ key + "+" + val + "+" + temp.nodeId + "+" + temp.ip + "+" + temp.port;
+		sendTo(msg,temp.ip, temp.port);
+
+	}
+}
+
+
 int main()
 {
 	pthread_t t1;
@@ -732,11 +977,15 @@ int main()
 		}
 		else if(ss=="put")
 		{
+			addr temp;
 			str >> ss;
 			string key=ss;
 			str >> ss;
 			string val=ss;
-			putKey(key,val);
+			temp.nodeId = node.nodeId;
+			temp.ip = node.ip;
+			temp.port = node.port;
+			putKey(key,val,temp);
 		}
 		else if(ss=="get")
 		{
@@ -745,9 +994,16 @@ int main()
 		}
 		else if(ss=="print")
 		print(node);
-		else if(ss=="quit")
+		else if(ss=="shutdown")
 		{
-			
+			shutdown_fn();
+			exit(0);
 		}
+		else if(ss == "quit")
+		{
+			quit_fn();
+			remtable();
+		}
+		// cin.ignore();
 	}
 }
