@@ -920,11 +920,35 @@ vector<addr> v;
 
 }
 
+addr retrive()
+{
+	for(int i=0;i<4;i++)
+	{
+		if(node.lSet[i].nodeId != "_")
+			return node.lSet[i];
+	}
+	for(int i=0;i<4;i++)
+	{
+		if(node.nSet[i].nodeId != "_")
+			return node.nSet[i];
+	}
+	for(int i=0;i<8;i++)
+	{
+		for(int j=0;j<16;j++)
+		{
+			if(node.rTable[i][j].nodeId != "_" && node.rTable[i][j].nodeId != node.nodeId)
+				return node.rTable[i][j];
+		}
+	}
+	exit(0);
+}
+
 void remtable()//---------------removing all 
 {
-	string msg = "putkeywhenquit+";
+	//string msg = "putkeywhenquit+";
 	for(auto it = mytable.begin(); it != mytable.end() ;it++)
 	{
+		string msg = "putkeywhenquit+";
 		string k = it->first;
 		cout<<"string k = "<<k<<endl;
 		string val  = it->second;
@@ -932,15 +956,35 @@ void remtable()//---------------removing all
 		addr temp = mytable2[k];
 		string key = keyhashtable[k];
 		cout<<"string key = "<<key<<endl;
-		msg = msg+ key + "+" + val + "+" + temp.nodeId + "+" + temp.ip + "+" + temp.port;
+		if(temp.nodeId != node.nodeId)
+			msg = msg+ key + "+" + val + "+" + temp.nodeId + "+" + temp.ip + "+" + temp.port;
+		else{
+			temp = retrive();
+			msg = msg+ key + "+" + val + "+" + temp.nodeId + "+" + temp.ip + "+" + temp.port;
+		}
 		sendTo(msg,temp.ip, temp.port);
-
+		sleep(1);
 	}
+}
+
+void handle_sigint(int sig)
+{
+	cout<<"hello"<<endl;
+	quit_fn();
+	remtable();
+	exit(0);
 }
 
 
 int main()
 {
+	signal(SIGINT, handle_sigint);
+	signal(SIGHUP, handle_sigint);
+	signal(SIGQUIT, handle_sigint); 
+	signal(SIGILL, handle_sigint);
+	signal(SIGTRAP, handle_sigint);
+	signal(SIGABRT, handle_sigint);
+
 	pthread_t t1;
 	string comm;
 	convert();
@@ -1003,7 +1047,7 @@ int main()
 		{
 			quit_fn();
 			remtable();
+			exit(0);
 		}
-		// cin.ignore();
 	}
 }
