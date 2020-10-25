@@ -1,6 +1,6 @@
 # Pastry
 
-![Screenshot](Architecture.jpg)
+![Screenshot](pastry_architecture.jpg)
 
 ## Node Structure:
 1. IPv4(String)
